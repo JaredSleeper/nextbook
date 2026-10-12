@@ -4,11 +4,11 @@
   const KEY = "nextbook:v1";
 
   const EXAMPLES = {
-    "Sci-fi": ["Dune", "Ender's Game", "The Left Hand of Darkness", "Hyperion", "Foundation", "Neuromancer", "The Martian", "Snow Crash", "The Hitchhiker's Guide to the Galaxy", "Ready Player One"],
-    "Literary fiction": ["The Remains of the Day", "Never Let Me Go", "Beloved", "The Corrections", "Atonement", "A Little Life", "The Goldfinch", "White Teeth", "The Road", "Middlesex"],
-    "Fantasy": ["The Name of the Wind", "The Hobbit", "A Game of Thrones", "Mistborn", "The Way of Kings", "The Lies of Locke Lamora", "American Gods", "The Fellowship of the Ring", "Good Omens", "The Night Circus"],
-    "Classics": ["Pride and Prejudice", "Jane Eyre", "1984", "To Kill a Mockingbird", "The Great Gatsby", "Wuthering Heights", "Crime and Punishment", "Anna Karenina", "Brave New World", "Of Mice and Men"],
-    "Nonfiction": ["Sapiens", "Thinking, Fast and Slow", "Outliers", "Freakonomics", "The Immortal Life of Henrietta Lacks", "Into Thin Air", "In Cold Blood", "Educated", "Quiet", "Guns, Germs, and Steel"],
+    "Sci-fi": [126, 70, 1574, 729, 276, 400, 141, 442, 54, 215],
+    "Literary fiction": [820, 268, 354, 658, 212, 1198, 146, 1005, 104, 115],
+    "Fantasy": [192, 7, 39, 389, 562, 746, 167, 19, 283, 185],
+    "Classics": [10, 43, 13, 4, 5, 63, 177, 172, 55, 32],
+    "Nonfiction": [2205, 619, 193, 92, 208, 236, 181, 81, 385, 408],
   };
 
   const state = loadState();
@@ -91,12 +91,18 @@
 
   async function runSearch(q) {
     const seq = ++searchSeq;
-    let data;
-    try { data = await api("/api/search?q=" + encodeURIComponent(q) + "&limit=8"); } catch (e) { return; }
-    if (seq !== searchSeq) return;
-    hits = Array.isArray(data) ? data : data.results || [];
-    active = hits.length ? 0 : -1;
-    paintHits();
+    const url = (src) => "/api/search?q=" + encodeURIComponent(q) + "&limit=8&source=" + src;
+    const apply = (data) => {
+      if (seq !== searchSeq) return;
+      hits = Array.isArray(data) ? data : data.results || [];
+      active = hits.length ? 0 : -1;
+      paintHits();
+    };
+    let local = null;
+    try { local = await api(url("local")); apply(local); } catch (e) { /* fall through */ }
+    const n = local ? (local.results || local).length : 0;
+    if (n >= 8) return;
+    try { apply(await api(url("all"))); } catch (e) { /* keep local */ }
   }
   function paintHits() {
     results.replaceChildren();
@@ -139,18 +145,12 @@
   }
 
   async function loadExample(name) {
-    const titles = EXAMPLES[name];
     $("#count").textContent = "Loading the example list...";
-    const found = await Promise.all(titles.map(async (t) => {
-      try {
-        const d = await api("/api/search?q=" + encodeURIComponent(t) + "&limit=3");
-        const list = Array.isArray(d) ? d : d.results || [];
-        return list.find((b) => b.in_catalog) || list[0];
-      } catch (e) { return null; }
+    const found = await Promise.all(EXAMPLES[name].map(async (n) => {
+      try { return slim(await api("/api/book/gb:" + n)); } catch (e) { return null; }
     }));
-    state.seeds = []; state.liked = []; state.disliked = []; state.read = []; state.prompt = "";
-    for (const b of found) if (b && !state.seeds.some((s) => s.id === b.id)) state.seeds.push({ id: b.id, title: b.title, author: b.author, cover: b.cover });
-    state.seeds = state.seeds.slice(0, MAX);
+    state.seeds = found.filter(Boolean).slice(0, MAX);
+    state.liked = []; state.disliked = []; state.read = []; state.prompt = "";
     save(); paintSlots(); showResults();
   }
   const ex = $("#example-links");

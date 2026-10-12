@@ -137,12 +137,12 @@ def main():
 
     variants = {
         "popularity": None,
-        "cf ease": Params(cf_method="ease", w_cf=1.0, w_content=0.0),
-        "cf cosine": Params(cf_method="cosine", w_cf=1.0, w_content=0.0),
-        "content only": Params(w_cf=0.0, w_content=1.0),
+        "cf ease": Params(cf_method="ease", w_cf=1.0, w_content=0.0, pop_beta=0.0),
+        "cf cosine": Params(cf_method="cosine", w_cf=1.0, w_content=0.0, pop_beta=0.0),
+        "content only": Params(w_cf=0.0, w_content=1.0, pop_beta=0.0),
         "hybrid ease .7/.3": Params(pop_beta=0.0),
-        "hybrid ease .85/.15": Params(w_cf=0.85, w_content=0.15),
-        "hybrid ease .5/.5": Params(w_cf=0.5, w_content=0.5),
+        "hybrid ease .85/.15": Params(w_cf=0.85, w_content=0.15, pop_beta=0.0),
+        "hybrid ease .5/.5": Params(w_cf=0.5, w_content=0.5, pop_beta=0.0),
         "hybrid ease .7/.3 pop.15": Params(pop_beta=0.15),
         "hybrid ease .7/.3 pop.3": Params(pop_beta=0.3),
         "hybrid cosine .7/.3": Params(cf_method="cosine"),
