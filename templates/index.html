@@ -1,27 +1,73 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>nextbook</title>
-  </head>
-  <body>
-    <main>
-      <h1>nextbook</h1>
-      <form id="search-form">
-        <label for="query">Find a favorite book</label>
-        <input id="query" name="q" type="search" autocomplete="off">
-        <button type="submit">Search</button>
-      </form>
-      <pre id="results"></pre>
-    </main>
-    <script>
-      document.querySelector("#search-form").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const query = document.querySelector("#query").value;
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        document.querySelector("#results").textContent = JSON.stringify(await response.json(), null, 2);
-      });
-    </script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nextbook: find your next book</title>
+<meta name="description" content="Tell us your ten favorite books. Get picks you'll actually like.">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">nextbook</a>
+  <button id="edit-btn" class="link-btn" hidden>Edit my favorites</button>
+</header>
+
+<main>
+  <section id="setup">
+    <h1>Your ten favorite books</h1>
+    <p class="sub">Add the books you've loved most. Ten works best, but three is enough to start.</p>
+    <div class="search-wrap">
+      <input id="search" type="search" autocomplete="off" placeholder="Search by title or author" aria-label="Search books">
+      <ul id="search-results" class="search-results" hidden></ul>
+    </div>
+    <ol id="slots" class="slots"></ol>
+    <div class="setup-actions">
+      <button id="go-btn" class="primary" disabled>Show my books</button>
+      <span id="count" class="muted"></span>
+    </div>
+    <div class="examples">
+      <span class="muted">Or try someone else's list:</span>
+      <span id="example-links"></span>
+    </div>
+  </section>
+
+  <section id="results" hidden>
+    <div id="mine" class="mine"></div>
+    <form id="ask" class="ask">
+      <input id="prompt" type="text" maxlength="300" placeholder="Anything specific? Try &quot;something short and funny&quot; or &quot;set in Japan&quot;" aria-label="What are you in the mood for?">
+      <button class="primary" type="submit">Ask</button>
+      <button id="clear-prompt" class="link-btn" type="button" hidden>Clear</button>
+    </form>
+    <div id="rows"></div>
+  </section>
+</main>
+
+<aside id="drawer" class="drawer" hidden>
+  <div class="drawer-back" data-close></div>
+  <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="d-title">
+    <button class="drawer-x" data-close aria-label="Close">&times;</button>
+    <div class="d-head">
+      <div id="d-cover" class="d-cover"></div>
+      <div>
+        <h2 id="d-title"></h2>
+        <p id="d-author" class="d-author"></p>
+        <p id="d-meta" class="muted"></p>
+        <p id="d-tags" class="d-tags"></p>
+      </div>
+    </div>
+    <p id="d-reason" class="d-reason" hidden></p>
+    <p id="d-desc" class="d-desc"></p>
+    <div class="d-actions">
+      <button data-act="liked">Looks good, more like this</button>
+      <button data-act="read">Already read it</button>
+      <button data-act="disliked">Not for me</button>
+    </div>
+    <p class="d-links"><a id="d-gr" target="_blank" rel="noopener">Goodreads</a><a id="d-ol" target="_blank" rel="noopener">Open Library</a></p>
+  </div>
+</aside>
+
+<footer class="foot muted">Ratings data from goodbooks-10k (CC BY-SA 4.0). Covers from Goodreads and Open Library.</footer>
+<script src="/static/app.js"></script>
+</body>
 </html>

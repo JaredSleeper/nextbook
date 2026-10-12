@@ -13,6 +13,7 @@ import httpx
 import numpy as np
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
@@ -285,6 +286,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="nextbook", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
 
 @app.get("/", response_class=HTMLResponse)

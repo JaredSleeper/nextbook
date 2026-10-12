@@ -10,6 +10,7 @@ COPY src ./src
 RUN uv sync --frozen --no-dev
 RUN uv run python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-small-en-v1.5')"
 COPY templates ./templates
+COPY static ./static
 COPY data ./data
 ENV PATH="/app/.venv/bin:$PATH"
 CMD ["sh", "-c", "uvicorn nextbook.app:app --host 0.0.0.0 --port ${PORT:-8000}"]
