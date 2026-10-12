@@ -33,7 +33,7 @@ _SERIES_SUFFIX = re.compile(
     re.IGNORECASE,
 )
 _DERIVATIVE_TITLE = re.compile(
-    r"^(?:the\s+)?(?:complete|ultimate|essential)\s|"
+    r"^the\s+ultimate\s|"
     r"box(?:ed)?\s*set|omnibus|collection|complete\s+(?:novels|series|works)|"
     r"trilogy\s*$|quartet|summary|sparknotes|cliffsnotes|study\s+guide|bookrags|"
     r"part\s+\d+\s+of\s+\d+|,\s*part\s+\d\b|\b\d+-book\b",

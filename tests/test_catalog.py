@@ -102,8 +102,9 @@ def test_derivative_editions_are_flagged(title):
     ("title", "expected"),
     [
         ("The Ultimate Hitchhiker's Guide to the Galaxy", True),
-        ("The Complete Sherlock Holmes", True),
-        ("The Hitchhiker's Guide to the Galaxy", False),
+        ("The Complete Sherlock Holmes", False),
+        ("Complete Me", False),
+        ("Ultimate Spider-Man, Volume 1: Power and Responsibility", False),
     ],
 )
 def test_complete_or_ultimate_title_prefixes(title, expected):
