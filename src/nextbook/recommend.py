@@ -6,13 +6,15 @@ from pathlib import Path
 
 import numpy as np
 
+from nextbook.catalog import is_seed_adaptation, normalize_series
+
 
 @dataclass
 class Params:
     cf_method: str = "ease"
     w_cf: float = 0.7
     w_content: float = 0.3
-    pop_beta: float = 0.0
+    pop_beta: float = 0.15
 
 
 _DEFAULT_PARAMS = Params()
@@ -46,6 +48,7 @@ class Engine:
         self.cosine_indices = cosine_indices
         self.cosine_weights = cosine_weights.astype(np.float32)
         self.id_to_index = {int(book["id"]): index for index, book in enumerate(catalog)}
+        self.series_keys = [normalize_series(book.get("series")) for book in catalog]
         self.work_to_index = {
             book["openlibrary_work_key"]: index
             for index, book in enumerate(catalog)
@@ -58,6 +61,30 @@ class Engine:
         if method == "cosine":
             return self.cosine_indices, self.cosine_weights
         raise ValueError(f"Unknown CF method: {method}")
+
+    def _seed_context(
+        self, seed_ids: list[int], external_seed_titles: list[str]
+    ) -> tuple[set[str], list[str]]:
+        seed_series = {self.series_keys[index] for index in seed_ids}
+        seed_series.discard("")
+        seed_titles = [self.catalog[index].get("title", "") for index in seed_ids]
+        seed_titles.extend(external_seed_titles)
+        return seed_series, seed_titles
+
+    def _candidate_allowed(
+        self,
+        index: int,
+        blocked: set[int],
+        seed_series: set[str],
+        seed_titles: list[str],
+    ) -> bool:
+        book = self.catalog[index]
+        return (
+            index not in blocked
+            and not book.get("is_derivative", False)
+            and self.series_keys[index] not in seed_series
+            and not is_seed_adaptation(book.get("title", ""), seed_titles)
+        )
 
     def _taste_vector(
         self,
@@ -143,30 +170,30 @@ class Engine:
         extra_vectors: list[np.ndarray] = (),
         liked: list[int] = (),
         disliked: list[int] = (),
+        external_seed_titles: list[str] = (),
     ) -> list[tuple[int, float]]:
         if k <= 0:
             return []
         ranked, _, _ = self.score_pool(seed_ids, params, extra_vectors, liked, disliked)
         blocked = set(seed_ids) | set(exclude) | set(disliked)
-        seed_series = {self.catalog[index].get("series") for index in seed_ids}
-        seed_series.discard(None)
+        seed_series, seed_titles = self._seed_context(seed_ids, external_seed_titles)
         eligible = []
         for index, score in ranked:
-            if index in blocked or self.catalog[index].get("series") in seed_series:
+            if not self._candidate_allowed(index, blocked, seed_series, seed_titles):
                 continue
             eligible.append((index, score))
-        min_number: dict[str, int] = {}
+        min_number: dict[str, float] = {}
         for index, _ in eligible:
             book = self.catalog[index]
-            series = book.get("series")
+            series = self.series_keys[index]
             number = book.get("series_number")
-            if series and isinstance(number, int):
+            if series and isinstance(number, (int, float)) and not isinstance(number, bool):
                 min_number[series] = min(number, min_number.get(series, number))
         result = []
         seen_series = set()
         for index, score in eligible:
             book = self.catalog[index]
-            series = book.get("series")
+            series = self.series_keys[index]
             number = book.get("series_number")
             if series and series in min_number:
                 if number != min_number[series] or series in seen_series:
@@ -184,58 +211,55 @@ class Engine:
         disliked: list[int] = (),
         read: set[int] = frozenset(),
         extra_vectors: list[np.ndarray] = (),
+        external_seed_titles: list[str] = (),
     ) -> list[dict]:
         excluded = set(read) | set(seed_ids) | set(disliked)
         ranked, cf, content = self.score_pool(
             seed_ids, extra_vectors=extra_vectors, liked=liked, disliked=disliked
         )
-        blocked = excluded | set(disliked)
-        seed_series = {self.catalog[index].get("series") for index in seed_ids}
-        seed_series.discard(None)
+        seed_series, seed_titles = self._seed_context(seed_ids, external_seed_titles)
         ranked = [
             (index, score)
             for index, score in ranked
-            if index not in blocked and self.catalog[index].get("series") not in seed_series
+            if self._candidate_allowed(index, excluded, seed_series, seed_titles)
         ]
-        minimum_series_number: dict[str, int] = {}
+        minimum_series_number: dict[str, float] = {}
         for index, _ in ranked:
             book = self.catalog[index]
-            series = book.get("series")
+            series = self.series_keys[index]
             number = book.get("series_number")
-            if series and isinstance(number, int):
+            if series and isinstance(number, (int, float)) and not isinstance(number, bool):
                 minimum_series_number[series] = min(
                     number, minimum_series_number.get(series, number)
                 )
         ranked = [
             (index, score)
             for index, score in ranked
-            if not self.catalog[index].get("series")
+            if not self.series_keys[index]
             or self.catalog[index].get("series_number")
-            == minimum_series_number.get(self.catalog[index]["series"])
+            == minimum_series_number.get(self.series_keys[index])
         ]
 
         def books_from(values: list[tuple[int, float]], limit: int) -> list[dict]:
-            seed_series = {self.catalog[seed].get("series") for seed in seed_ids}
-            seed_series.discard(None)
             eligible = [
                 (index, score)
                 for index, score in values
-                if index not in excluded and self.catalog[index].get("series") not in seed_series
+                if self._candidate_allowed(index, excluded, seed_series, seed_titles)
             ]
-            min_number: dict[str, int] = {}
+            min_number: dict[str, float] = {}
             for index, _ in eligible:
                 book = self.catalog[index]
-                series = book.get("series")
+                series = self.series_keys[index]
                 number = book.get("series_number")
-                if series and isinstance(number, int):
+                if series and isinstance(number, (int, float)) and not isinstance(number, bool):
                     min_number[series] = min(number, min_number.get(series, number))
             kept = []
             counts: dict[str, int] = {}
             seen_series = set()
             for index, _ in eligible:
                 book = self.catalog[index]
-                series = book.get("series")
-                if series and book.get("series_number") is not None:
+                series = self.series_keys[index]
+                if series and book.get("series_number") is not None and series in min_number:
                     if book["series_number"] != min_number.get(series) or series in seen_series:
                         continue
                     seen_series.add(series)
@@ -254,8 +278,6 @@ class Engine:
             seed_ids,
             key=lambda seed: -float(neighbor_weights[seed][neighbor_weights[seed] != 0].sum()),
         )
-        seed_series = {self.catalog[index].get("series") for index in seed_ids}
-        seed_series.discard(None)
         for seed in seed_strength[:3]:
             candidates = [
                 (int(index), float(weight))
@@ -263,8 +285,7 @@ class Engine:
                     neighbor_indices[seed], neighbor_weights[seed], strict=True
                 )
                 if weight != 0
-                and int(index) not in excluded
-                and self.catalog[int(index)].get("series") not in seed_series
+                and self._candidate_allowed(int(index), excluded, seed_series, seed_titles)
             ]
             candidates.sort(key=lambda pair: pair[1], reverse=True)
             rows.append(
@@ -322,8 +343,7 @@ class Engine:
             )
             for index, book in enumerate(self.catalog)
             if book.get("author") in seed_authors
-            and index not in excluded
-            and book.get("series") not in seed_series
+            and self._candidate_allowed(index, excluded, seed_series, seed_titles)
         ]
         authored.sort(key=lambda pair: pair[1], reverse=True)
         author_books = books_from(authored, 15)

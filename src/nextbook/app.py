@@ -8,6 +8,7 @@ from collections import OrderedDict
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import numpy as np
@@ -93,7 +94,7 @@ async def search_open_library(query: str, limit: int) -> list[dict]:
         _SEARCH_CACHE.move_to_end(cache_key)
         return list(_SEARCH_CACHE[cache_key])
     try:
-        async with httpx.AsyncClient(timeout=3.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=2.5, follow_redirects=True) as client:
             response = await client.get(
                 f"{OL_BASE}/search.json",
                 params={
@@ -304,10 +305,11 @@ async def search(
     request: Request,
     q: str = Query(default=""),
     limit: int = Query(default=8, ge=1, le=25),
+    source: Literal["local", "all"] = Query(default="all"),
 ):
     engine: Engine = request.app.state.engine
     local = local_search(engine, q, limit)
-    if len(local) >= limit or not q.strip():
+    if source == "local" or len(local) >= limit or not q.strip():
         return {"results": local}
     local_keys = {
         (normalize(book.get("title", "")), normalize(book.get("author", "")))
@@ -335,7 +337,14 @@ async def recommendations(body: RecommendationRequest, request: Request):
     liked = resolve_catalog_ids(engine, body.liked)
     disliked = resolve_catalog_ids(engine, body.disliked)
     read = set(resolve_catalog_ids(engine, body.read))
-    rows = engine.build_rows(seeds, liked, disliked, read, external_vectors)
+    rows = engine.build_rows(
+        seeds,
+        liked,
+        disliked,
+        read,
+        external_vectors,
+        external_seed_titles=[seed.title for seed in body.seeds],
+    )
     output = [
         {
             "key": row["key"],
@@ -401,6 +410,7 @@ async def picks(body: PicksRequest, request: Request):
         extra_vectors=external_vectors,
         liked=liked,
         disliked=disliked,
+        external_seed_titles=[seed.title for seed in body.seeds],
     )
     top_candidates = ranked[:100]
     candidate_indices = [index for index, _ in top_candidates]

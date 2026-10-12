@@ -76,6 +76,40 @@ def test_picks_falls_back_after_claude_failure(fixture_data, monkeypatch):
     assert all(book["reason"] is None for book in payload["books"])
 
 
+def test_picks_candidates_exclude_derivatives_and_adaptations(fixture_data, monkeypatch):
+    original_load = app_module.load
+    captured = {}
+
+    def load_with_derivatives(data_dir):
+        engine = original_load(data_dir)
+        engine.catalog[2]["is_derivative"] = True
+        engine.catalog[5]["title"] = "Book 10: Graphic Novel"
+        return engine
+
+    def fake_choose(seeds, liked, disliked, prompt, candidates):
+        captured["candidates"] = candidates
+        return (
+            [
+                {"id": candidate["id"], "reason": "Connects to Book 10."}
+                for candidate in candidates[:6]
+            ],
+            123,
+            45,
+        )
+
+    monkeypatch.setattr(app_module, "load", load_with_derivatives)
+    monkeypatch.setattr(app_module.llm, "choose_picks", fake_choose)
+    with TestClient(app_module.app) as client:
+        response = client.post("/api/picks", json=request_body())
+    assert response.status_code == 200
+    assert captured["candidates"]
+    assert all(not candidate.get("is_derivative") for candidate in captured["candidates"])
+    assert all(
+        not candidate["title"].startswith("Book 10: Graphic Novel")
+        for candidate in captured["candidates"]
+    )
+
+
 def test_search_uses_local_then_dedupes_open_library(fixture_data, monkeypatch):
     async def fake_search(query, limit):
         return [
@@ -107,3 +141,14 @@ def test_search_uses_local_then_dedupes_open_library(fixture_data, monkeypatch):
     assert len(results) == 2
     assert results[0]["id"] == "gb:1"
     assert results[1]["id"] == "ol:/works/OL2W"
+
+
+def test_search_local_source_never_calls_open_library(fixture_data, monkeypatch):
+    async def fail_search(*args, **kwargs):
+        raise AssertionError("local search called Open Library")
+
+    monkeypatch.setattr(app_module, "search_open_library", fail_search)
+    with TestClient(app_module.app) as client:
+        response = client.get("/api/search?q=Dune&limit=2&source=local")
+    assert response.status_code == 200
+    assert response.json()["results"][0]["id"] == "gb:1"

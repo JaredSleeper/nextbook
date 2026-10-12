@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from scipy import linalg, sparse
 
-from nextbook.catalog import clean_isbn, clean_isbn13, clean_tag, parse_title
+from nextbook.catalog import clean_isbn, clean_isbn13, clean_tag, is_derivative, parse_title
 
 RAW_FILES = {
     name: f"https://raw.githubusercontent.com/zygmuntz/goodbooks-10k/master/{name}.csv"
@@ -71,7 +71,8 @@ def make_catalog(raw_dir: Path, descriptions: dict[int, dict[str, str | None]]) 
     with (raw_dir / "books.csv").open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             book_id = int(row["book_id"])
-            title, series, series_number = parse_title(row.get("title", ""))
+            raw_title = row.get("title", "")
+            title, series, series_number = parse_title(raw_title)
             authors = [
                 author.strip() for author in row.get("authors", "").split(",") if author.strip()
             ]
@@ -102,6 +103,13 @@ def make_catalog(raw_dir: Path, descriptions: dict[int, dict[str, str | None]]) 
                     "title": title,
                     "series": series,
                     "series_number": series_number,
+                    "is_derivative": is_derivative(
+                        {
+                            "title": title,
+                            "raw_title": raw_title,
+                            "author": authors[0] if authors else "",
+                        }
+                    ),
                     "author": authors[0] if authors else "",
                     "authors": authors,
                     "year": year,
