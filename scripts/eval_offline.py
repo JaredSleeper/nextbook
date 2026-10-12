@@ -145,7 +145,7 @@ def main():
         "hybrid ease .5/.5": Params(w_cf=0.5, w_content=0.5, pop_beta=0.0),
         "hybrid ease .7/.3 pop.15": Params(pop_beta=0.15),
         "hybrid ease .7/.3 pop.3": Params(pop_beta=0.3),
-        "hybrid cosine .7/.3": Params(cf_method="cosine"),
+        "hybrid cosine .7/.3": Params(cf_method="cosine", pop_beta=0.0),
     }
     results = {}
     for name, p in variants.items():

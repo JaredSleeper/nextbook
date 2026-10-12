@@ -99,6 +99,18 @@ def test_derivative_editions_are_flagged(title):
 
 
 @pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("The Ultimate Hitchhiker's Guide to the Galaxy", True),
+        ("The Complete Sherlock Holmes", True),
+        ("The Hitchhiker's Guide to the Galaxy", False),
+    ],
+)
+def test_complete_or_ultimate_title_prefixes(title, expected):
+    assert is_derivative({"title": title}) is expected
+
+
+@pytest.mark.parametrize(
     "title",
     [
         "The Hunger Games (The Hunger Games, #1)",
