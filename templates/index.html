@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>nextbook</title>
+  </head>
+  <body>
+    <main>
+      <h1>nextbook</h1>
+      <form id="search-form">
+        <label for="query">Find a favorite book</label>
+        <input id="query" name="q" type="search" autocomplete="off">
+        <button type="submit">Search</button>
+      </form>
+      <pre id="results"></pre>
+    </main>
+    <script>
+      document.querySelector("#search-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = document.querySelector("#query").value;
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        document.querySelector("#results").textContent = JSON.stringify(await response.json(), null, 2);
+      });
+    </script>
+  </body>
+</html>

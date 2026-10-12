@@ -6,4 +6,5 @@ __pycache__/
 .env
 data/raw/
 data/descriptions.jsonl.tmp
+data_eval/
 models/
